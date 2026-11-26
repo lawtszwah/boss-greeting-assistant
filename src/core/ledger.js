@@ -296,7 +296,7 @@ export function createLedger({
     },
 
     /**
-     * 记录发送结果。success 需附证据类型（'success_toast' | 'entry_state_changed'）。
+     * 记录发送结果。success 需附证据类型，首版只有 'greet_dialog'（「已向BOSS发送消息」弹窗）。
      * 未知结果用 needs_review；平台明确拒绝用 rejected。
      */
     resolveAttempt(attemptId, { result, evidence = null, error = null }) {
