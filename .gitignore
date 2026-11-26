@@ -1,0 +1,44 @@
+# System and editor files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Dependencies and build output
+node_modules/
+dist/
+build/
+coverage/
+*.zip
+
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials*.json
+config.local.*
+
+# Local browser, account and job-search data
+.local/
+local-data/
+data/
+logs/
+screenshots/
+browser-profile/
+chrome-profile/
+user-data/
+resumes/
+*.log
+*.sqlite
+*.sqlite3
+*.db
+cookies*.json
+storage-state*.json
+auth-state*.json
+
+# Agent and tool configuration
+.agents/
+.codex/
+.aws/
