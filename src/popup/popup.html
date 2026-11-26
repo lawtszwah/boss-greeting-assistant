@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>BOSS Greeting Assistant</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="top">
+    <h1>BOSS 打招呼助手</h1>
+    <span id="status-pill" class="pill" data-status="idle">未运行</span>
+  </header>
+
+  <section id="risk" class="card risk" hidden>
+    <h2>使用前请确认</h2>
+    <ul id="risk-list"></ul>
+    <label class="check"><input type="checkbox" id="risk-check"> 我已阅读并理解以上风险</label>
+    <button id="risk-confirm" class="primary" disabled>确认</button>
+  </section>
+
+  <main id="app" hidden>
+    <section class="card">
+      <div class="row between">
+        <div>
+          <div class="label">当前城市</div>
+          <div id="city" class="value">—</div>
+        </div>
+        <div class="actions">
+          <button id="start" class="primary">开始</button>
+          <button id="stop" class="danger" hidden>停止</button>
+        </div>
+      </div>
+      <p class="hint">使用你在 BOSS 平台设置的默认招呼语，请先在平台的「消息通知 - 设置招呼语」中开启。</p>
+      <p id="page-warning" class="warning" hidden></p>
+      <p id="message" class="message" role="status" aria-live="polite"></p>
+
+      <dl class="stats">
+        <div><dt>已沟通</dt><dd id="c-contacted">0</dd></div>
+        <div><dt>待核对</dt><dd id="c-review">0</dd></div>
+        <div><dt>失败</dt><dd id="c-failed">0</dd></div>
+        <div><dt>跳过</dt><dd id="c-skipped">0</dd></div>
+      </dl>
+      <div class="row small">
+        <span>本次额度 <b id="q-session">0</b>/<span id="q-session-max">—</span></span>
+        <span>今日额度 <b id="q-daily">0</b>/<span id="q-daily-max">—</span></span>
+      </div>
+      <div id="position" class="small muted"></div>
+      <div id="timezone" class="warning" hidden>
+        时区与记录不一致，当日额度已暂停累计。
+        <button id="tz-accept" class="link">按当前时区继续累计</button>
+      </div>
+    </section>
+
+    <section class="card" id="review-section">
+      <h2>待核对 <span id="review-count" class="count">0</span></h2>
+      <p class="small muted">点击后结果不明的岗位。请在平台上确认后标记；插件不会自动重发。</p>
+      <ul id="review-list" class="items"></ul>
+      <details id="not-sent-section" hidden>
+        <summary>已确认未发送 <span id="not-sent-count" class="count">0</span></summary>
+        <ul id="not-sent-list" class="items"></ul>
+      </details>
+    </section>
+
+    <details class="card" id="settings">
+      <summary><h2>设置</h2></summary>
+      <form id="settings-form" novalidate>
+        <label>搜索关键词 <span class="muted">每行一个，最多 10 个</span>
+          <textarea name="keywords" rows="3"></textarea>
+        </label>
+        <div class="grid2">
+          <label>求职类型<select name="jobType"></select></label>
+          <label>薪资<select name="salaryBucket"></select></label>
+          <label>工作经验<select name="experience"></select></label>
+          <label>学历<select name="degree"></select></label>
+        </div>
+        <label>排除关键词 <span class="muted">标题、标签、公司名中出现即跳过</span>
+          <textarea name="excludeKeywords" rows="2"></textarea>
+        </label>
+        <label>排除公司
+          <textarea name="excludeCompanies" rows="2"></textarea>
+        </label>
+        <div class="grid2">
+          <label>本次发送上限<input name="sessionLimit" type="number" min="1" max="30"></label>
+          <label>当日发送上限<input name="dailyLimit" type="number" min="1" max="30"></label>
+          <label>发送间隔最小（秒）<input name="sendIntervalMin" type="number" min="15"></label>
+          <label>发送间隔最大（秒）<input name="sendIntervalMax" type="number" min="15"></label>
+          <label>其他操作间隔最小（秒）<input name="actionIntervalMin" type="number" min="3"></label>
+          <label>其他操作间隔最大（秒）<input name="actionIntervalMax" type="number" min="3"></label>
+          <label>每关键词最多批次<input name="maxBatchesPerKeyword" type="number" min="1" max="20"></label>
+        </div>
+        <ul id="form-errors" class="errors"></ul>
+        <div class="row end">
+          <span id="saved" class="small muted"></span>
+          <button type="submit" class="primary">保存设置</button>
+        </div>
+        <p class="small muted">运行中修改的设置在下次任务生效。</p>
+      </form>
+    </details>
+
+    <details class="card" id="log-section">
+      <summary><h2>运行日志</h2></summary>
+      <ul id="log-list" class="log"></ul>
+    </details>
+
+    <footer class="small muted">
+      <span id="storage">本地存储 —</span>
+      <button id="show-risk" class="link">风险说明</button>
+    </footer>
+  </main>
+
+  <script src="popup.js"></script>
+</body>
+</html>

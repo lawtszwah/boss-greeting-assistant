@@ -129,3 +129,8 @@ export function listStatus(doc) {
   const loading = doc.querySelector(SEL.loading);
   return loading && isVisible(loading) ? 'loading' : 'empty';
 }
+
+/** 页面上显示的当前城市名，读不到时返回 null。 */
+export function readCityName(doc) {
+  return text(doc.querySelector(SEL.cityLabel)) || null;
+}

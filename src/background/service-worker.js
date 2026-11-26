@@ -4,12 +4,21 @@ import { createChromeStorage } from '../core/storage.js';
 import { createLedger } from '../core/ledger.js';
 import { createRunStore } from '../core/run-state.js';
 import { verifySearchUrl } from '../page/search-url.js';
+import { createSettingsStore } from '../core/settings.js';
+import { createLogStore } from '../core/log-store.js';
 import { RPC_METHODS } from '../shared/rpc.js';
+import { createApp } from './app.js';
 
 const storage = createChromeStorage(chrome.storage.local);
+const ledger = createLedger({ storage });
+const runs = createRunStore({ storage, urlMatches: (a, e) => verifySearchUrl(a, e).ok });
+const logs = createLogStore({ storage });
 const targets = {
-  ledger: createLedger({ storage }),
-  runs: createRunStore({ storage, urlMatches: (a, e) => verifySearchUrl(a, e).ok }),
+  ledger,
+  runs,
+  logs,
+  settings: createSettingsStore({ storage }),
+  app: createApp({ storage, ledger, runs, logs }),
 };
 
 async function handle(msg, sender) {
@@ -30,6 +39,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return true;
 });
 
-// 启动或唤醒时：没有存活锁则把遗留的未定尝试转为待核对，并清理过期日志。
-targets.ledger.recoverInterrupted().catch(() => {});
-targets.ledger.pruneLogs(30).catch(() => {});
+// 启动或唤醒时对账：没有存活锁则把遗留的未定尝试转为待核对、把运行中的任务标为暂停；并清理过期日志。
+targets.app.reconcile().catch(() => {});
+ledger.pruneLogs(30).catch(() => {});

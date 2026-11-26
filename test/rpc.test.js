@@ -4,6 +4,9 @@ import { RPC_METHODS, createRpcClient } from '../src/shared/rpc.js';
 import { createMemoryStorage } from '../src/core/storage.js';
 import { createLedger } from '../src/core/ledger.js';
 import { createRunStore } from '../src/core/run-state.js';
+import { createSettingsStore } from '../src/core/settings.js';
+import { createLogStore } from '../src/core/log-store.js';
+import { createApp } from '../src/background/app.js';
 
 function jsonBridge(targets) {
   // 模拟 chrome.runtime 消息：参数和返回值都经过 JSON 序列化。
@@ -21,7 +24,10 @@ function jsonBridge(targets) {
 
 test('开放的 RPC 方法都存在于后台对象上', () => {
   const storage = createMemoryStorage();
-  const targets = { ledger: createLedger({ storage }), runs: createRunStore({ storage }) };
+  const ledger = createLedger({ storage });
+  const runs = createRunStore({ storage });
+  const logs = createLogStore({ storage });
+  const targets = { ledger, runs, logs, settings: createSettingsStore({ storage }), app: createApp({ storage, ledger, runs, logs }) };
   for (const [target, methods] of Object.entries(RPC_METHODS)) {
     for (const m of methods) assert.equal(typeof targets[target][m], 'function', `${target}.${m}`);
   }

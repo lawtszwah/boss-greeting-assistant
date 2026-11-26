@@ -62,6 +62,7 @@ async function simulate(o) {
       random: () => 0,
       log: (e) => logs.push(e),
       heartbeatMs: 0,
+      ...(o.isRiskAcknowledged ? { isRiskAcknowledged: o.isRiskAcknowledged } : {}),
     });
 
   const startPage = makePage(o.startUrl ?? START_URL);
@@ -321,6 +322,12 @@ test('上次页面崩溃留下的运行状态不阻止新任务', async () => {
 test('无法确认当前城市时不启动', async () => {
   const r = await simulate({ startUrl: 'https://www.zhipin.com/web/geek/jobs', jobsByKeyword: {} });
   assert.deepEqual(r.started, { ok: false, reason: 'city_unknown' });
+});
+
+test('AC-20 未确认风险说明时不启动', async () => {
+  const r = await simulate({ jobsByKeyword: { 前端: [fakeJob(1)] }, isRiskAcknowledged: async () => false });
+  assert.deepEqual(r.started, { ok: false, reason: 'risk_not_acknowledged' });
+  assert.deepEqual(r.clicks, []);
 });
 
 test('配置无效时不启动', async () => {

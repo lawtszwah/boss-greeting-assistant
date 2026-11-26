@@ -1,6 +1,6 @@
 // 把页面读取与操作绑定到一个 document，供任务执行器使用。
 
-import { readCards, readDetail, verifyFilterState, detectBlocker, listStatus } from './reader.js';
+import { readCards, readDetail, verifyFilterState, detectBlocker, listStatus, readCityName } from './reader.js';
 import { selectCard, loadNextBatch, clickChatAndAwait, dismissGreetDialog, waitFor } from './actions.js';
 
 export const DEFAULT_TIMEOUTS = Object.freeze({
@@ -16,6 +16,7 @@ export function createPageAdapter(doc, timeouts = {}) {
   return {
     url: () => doc.defaultView.location.href,
     cityCode: () => new URL(doc.defaultView.location.href).searchParams.get('city'),
+    cityName: () => readCityName(doc),
     detectBlocker: () => detectBlocker(doc),
     /** 等待列表就绪或明确无结果；超时返回 'timeout'。 */
     async waitList() {
