@@ -96,6 +96,21 @@ test('AC-01 多关键词分别搜索，跨词重复岗位只处理一次', async
   assert.equal(r.run.counts.contacted, 4);
 });
 
+test('经验设为应届生：卡片显示「在校/应届」或实习卡片没有经验标签时都会处理', async () => {
+  const r = await simulate({
+    config: { keywords: ['前端'], experiences: ['应届生'] },
+    jobsByKeyword: {
+      前端: [
+        fakeJob(1, { experience: '在校/应届' }),
+        fakeJob(2, { experience: '5天/周', degree: '3个月' }),
+        fakeJob(3, { experience: '3-5年' }),
+      ],
+    },
+  });
+  assert.deepEqual(r.clicks, ['fake0001', 'fake0002']);
+  assert.equal(r.run.counts.skipped, 1);
+});
+
 test('关键词复核和排除项：不点击', async () => {
   const r = await simulate({
     config: { keywords: ['前端'], excludeCompanies: ['外包'] },

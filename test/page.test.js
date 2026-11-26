@@ -51,6 +51,10 @@ test('读取卡片：岗位 ID、链接、标题、公司、经验和学历；�
     { jobId: 'fake0002', url: 'https://www.zhipin.com/job_detail/fake0002.html', title: '前端工程师2', company: '示例公司2', experience: '3-5年', degree: '大专' },
   );
   assert.equal('salaryText' in cards[0], false);
+  // 实习卡片：标签为「天/周、月数、学历」。
+  const intern = readCards(createSearchPage({ jobs: [fakeJob(3, { experience: '5天/周', degree: '3个月' })] }).doc)[0];
+  assert.equal(intern.experience, '');
+  assert.equal(intern.degree, '');
   assert.equal(jobIdFromHref('/job_detail/a~b_c-1.html?ka=1'), 'a~b_c-1');
   assert.equal(jobIdFromHref('/gongsi/x.html'), null);
 });
