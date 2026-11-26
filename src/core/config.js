@@ -9,6 +9,19 @@ export const LIMITS = Object.freeze({
   maxBatchesPerKeyword: { min: 1, max: 20 },
 });
 
+/**
+ * 平台原生薪资档位（2026-11-26 页面核实，见 docs/PAGE-ADAPTATION.md）。
+ * 卡片薪资数字经字体混淆，插件不解码，薪资只通过原生筛选实现。
+ */
+export const SALARY_BUCKETS = Object.freeze({
+  402: '3K以下',
+  403: '3-5K',
+  404: '5-10K',
+  405: '10-20K',
+  406: '20-50K',
+  407: '50K以上',
+});
+
 export const DEFAULT_CONFIG = Object.freeze({
   keywords: [],
   // 求职类型只依赖平台原生筛选并在 M2 核验；空数组表示不限。
@@ -16,8 +29,8 @@ export const DEFAULT_CONFIG = Object.freeze({
   // 经验、学历：可接受的卡片取值列表，空数组表示不限。
   experiences: [],
   degrees: [],
-  salaryMinK: null,
-  salaryMaxK: null,
+  // 平台薪资档位代码，null 表示不限。
+  salaryBucket: null,
   excludeKeywords: [],
   excludeCompanies: [],
   sessionLimit: 20,
@@ -44,11 +57,6 @@ export function normalizeList(value) {
   return out;
 }
 
-function toNullableNumber(value) {
-  if (value === null || value === undefined || value === '') return null;
-  return typeof value === 'number' ? value : Number(value);
-}
-
 function toNumber(value, fallback) {
   if (value === null || value === undefined || value === '') return fallback;
   return typeof value === 'number' ? value : Number(value);
@@ -62,8 +70,10 @@ export function normalizeConfig(input = {}) {
     jobTypes: normalizeList(input.jobTypes),
     experiences: normalizeList(input.experiences),
     degrees: normalizeList(input.degrees),
-    salaryMinK: toNullableNumber(input.salaryMinK),
-    salaryMaxK: toNullableNumber(input.salaryMaxK),
+    salaryBucket:
+      input.salaryBucket === null || input.salaryBucket === undefined || input.salaryBucket === ''
+        ? null
+        : String(input.salaryBucket),
     excludeKeywords: normalizeList(input.excludeKeywords),
     excludeCompanies: normalizeList(input.excludeCompanies),
     sessionLimit: toNumber(input.sessionLimit, d.sessionLimit),
@@ -109,15 +119,8 @@ export function validateConfig(input) {
     errors.push({ field: 'keywords', message: `搜索关键词最多 ${LIMITS.maxKeywords} 个` });
   }
 
-  const { salaryMinK: lo, salaryMaxK: hi } = config;
-  if (lo !== null && !isNonNegative(lo)) {
-    errors.push({ field: 'salaryMinK', message: '最低薪资必须是非负数字' });
-  }
-  if (hi !== null && !isNonNegative(hi)) {
-    errors.push({ field: 'salaryMaxK', message: '最高薪资必须是非负数字' });
-  }
-  if (isNonNegative(lo) && isNonNegative(hi) && lo > hi) {
-    errors.push({ field: 'salaryMinK', message: '最低薪资不能高于最高薪资' });
+  if (config.salaryBucket !== null && !(config.salaryBucket in SALARY_BUCKETS)) {
+    errors.push({ field: 'salaryBucket', message: '薪资须选择平台提供的档位' });
   }
 
   if (!inRange(config.sessionLimit, LIMITS.sessionLimit)) {

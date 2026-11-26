@@ -11,7 +11,7 @@ test('默认值与关键词规范化', () => {
   assert.equal(r.config.sessionLimit, DEFAULT_CONFIG.sessionLimit);
   assert.equal(r.config.dailyLimit, 30);
   assert.deepEqual(r.config.sendIntervalSec, { min: 15, max: 30 });
-  assert.equal(r.config.salaryMinK, null);
+  assert.equal(r.config.salaryBucket, null);
 });
 
 test('空关键词与超过 10 个关键词', () => {
@@ -20,10 +20,10 @@ test('空关键词与超过 10 个关键词', () => {
   assert.deepEqual(fields(validateConfig({ keywords: many })), ['keywords']);
 });
 
-test('薪资倒置与负数', () => {
-  assert.deepEqual(fields(validateConfig({ keywords: ['a'], salaryMinK: 30, salaryMaxK: 20 })), ['salaryMinK']);
-  assert.deepEqual(fields(validateConfig({ keywords: ['a'], salaryMaxK: -1 })), ['salaryMaxK']);
-  assert.equal(validateConfig({ keywords: ['a'], salaryMinK: '', salaryMaxK: '25' }).config.salaryMaxK, 25);
+test('薪资只能选平台档位', () => {
+  assert.equal(validateConfig({ keywords: ['a'], salaryBucket: 405 }).config.salaryBucket, '405');
+  assert.equal(validateConfig({ keywords: ['a'], salaryBucket: '' }).config.salaryBucket, null);
+  assert.deepEqual(fields(validateConfig({ keywords: ['a'], salaryBucket: '999' })), ['salaryBucket']);
 });
 
 test('额度越界', () => {

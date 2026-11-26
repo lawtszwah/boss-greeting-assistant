@@ -1,15 +1,11 @@
 // 岗位卡片筛选（PRD §6.2）。输入是页面适配层提取出的字段，不接触 DOM。
 
-import { matchSalary } from './salary.js';
-
 /** 跳过原因代码。仅作用于本次任务（PRD §8「本次跳过」）。 */
 export const SKIP = Object.freeze({
   PARSE_FAILED: 'parse_failed',
   KEYWORD_MISS: 'keyword_miss',
   EXCLUDED_KEYWORD: 'excluded_keyword',
   EXCLUDED_COMPANY: 'excluded_company',
-  SALARY_MISMATCH: 'salary_mismatch',
-  SALARY_UNDETERMINABLE: 'salary_undeterminable',
   EXPERIENCE_MISMATCH: 'experience_mismatch',
   EXPERIENCE_UNDETERMINABLE: 'experience_undeterminable',
   DEGREE_MISMATCH: 'degree_mismatch',
@@ -37,7 +33,7 @@ function matchEnum(value, accepted, anyValues) {
 }
 
 /**
- * @param {{title?: string, company?: string, salaryText?: string, experience?: string,
+ * @param {{title?: string, company?: string, experience?: string,
  *          degree?: string, tags?: string[]}} job
  * @param {object} config 已校验的配置
  * @returns {{pass: true} | {pass: false, code: string, detail?: string}}
@@ -58,11 +54,7 @@ export function evaluateJob(job, config) {
     return { pass: false, code: SKIP.KEYWORD_MISS };
   }
 
-  const salary = matchSalary(job.salaryText, config.salaryMinK, config.salaryMaxK);
-  if (salary === 'fail') return { pass: false, code: SKIP.SALARY_MISMATCH, detail: job.salaryText };
-  if (salary === 'undeterminable') {
-    return { pass: false, code: SKIP.SALARY_UNDETERMINABLE, detail: job.salaryText ?? '' };
-  }
+  // 薪资由平台原生筛选负责，卡片薪资经字体混淆，不在此复核。
 
   const exp = matchEnum(job.experience, config.experiences, EXPERIENCE_ANY);
   if (exp === 'fail') return { pass: false, code: SKIP.EXPERIENCE_MISMATCH, detail: job.experience };

@@ -22,7 +22,7 @@ const limits = { sessionLimit: 20, dailyLimit: 30 };
 
 async function send(ledger, taskId, j, result = ATTEMPT_RESULT.SUCCESS, lim = limits) {
   const r = await ledger.beginAttempt({ taskId, job: j, ...lim });
-  if (r.ok) await ledger.resolveAttempt(r.attemptId, { result, evidence: result === 'success' ? 'success_toast' : null });
+  if (r.ok) await ledger.resolveAttempt(r.attemptId, { result, evidence: result === 'success' ? 'greet_dialog' : null });
   return r;
 }
 
@@ -58,7 +58,7 @@ test('成功需要证据，已沟通岗位跨任务去重（AC-10）', async () 
   await ledger.acquireLock({ taskId: 't1', ownerTabId: 1 });
   const r = await ledger.beginAttempt({ taskId: 't1', job: job('1'), ...limits });
   await assert.rejects(ledger.resolveAttempt(r.attemptId, { result: 'success' }), /evidence/);
-  await ledger.resolveAttempt(r.attemptId, { result: 'success', evidence: 'success_toast' });
+  await ledger.resolveAttempt(r.attemptId, { result: 'success', evidence: 'greet_dialog' });
   await assert.rejects(ledger.resolveAttempt(r.attemptId, { result: 'success', evidence: 'x' }), /already resolved/);
   await ledger.releaseLock('t1');
 
