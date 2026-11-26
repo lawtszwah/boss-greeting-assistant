@@ -5,6 +5,7 @@ export const ORIGIN = 'https://www.zhipin.com';
 export const SEARCH_PATH = '/web/geek/jobs';
 
 export const SEL = Object.freeze({
+  cityLabel: '.cur-city-label',
   listContainer: '.job-list-container',
   card: 'li.job-card-box',
   cardTitleLink: 'a.job-name',

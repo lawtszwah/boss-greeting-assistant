@@ -47,6 +47,7 @@ class Halt {
  * @param {(entry: object) => void} [deps.log]
  * @param {number} [deps.heartbeatMs] 0 表示不启动心跳定时器（测试用）
  * @param {() => string} [deps.newTaskId]
+ * @param {() => Promise<boolean>} [deps.isRiskAcknowledged] 首次风险确认（AC-20）
  */
 export function createTaskRunner({
   ledger,
@@ -58,6 +59,7 @@ export function createTaskRunner({
   log = () => {},
   heartbeatMs = 10_000,
   newTaskId = () => `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+  isRiskAcknowledged = async () => true,
 }) {
   let lockLost = false;
 
@@ -300,6 +302,7 @@ export function createTaskRunner({
      * @returns {Promise<{ok: true, taskId: string} | {ok: false, reason: string, errors?: object[]}>}
      */
     async start({ config: input, ownerTabId }) {
+      if (!(await isRiskAcknowledged())) return { ok: false, reason: 'risk_not_acknowledged' };
       const { ok, errors, config } = validateConfig(input);
       if (!ok) return { ok: false, reason: 'invalid_config', errors };
       const cityCode = page.cityCode();

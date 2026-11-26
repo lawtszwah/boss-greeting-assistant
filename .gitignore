@@ -42,3 +42,6 @@ auth-state*.json
 .agents/
 .codex/
 .aws/
+
+# Claude Code local configuration
+.claude/

@@ -1,4 +1,4 @@
-// 内容脚本与后台之间的 RPC。只开放执行器需要的方法。
+// 内容脚本、弹窗与后台之间的 RPC。只开放列出的方法。
 
 export const RPC_METHODS = Object.freeze({
   ledger: [
@@ -13,7 +13,12 @@ export const RPC_METHODS = Object.freeze({
     'cancelAttempt',
     'resolveAttempt',
     'listNeedsReview',
+    'listByStatus',
+    'lockStatus',
     'quotaStatus',
+    'reviewJob',
+    'requeueJob',
+    'acceptTimeZoneChange',
   ],
   runs: [
     'get',
@@ -27,6 +32,9 @@ export const RPC_METHODS = Object.freeze({
     'consumeNavToken',
     'finish',
   ],
+  settings: ['getConfig', 'saveConfig', 'getRiskAck', 'ackRisk'],
+  logs: ['append', 'list'],
+  app: ['status', 'reconcile'],
 });
 
 /** 生成调用后台对象的代理；send 默认为 chrome.runtime.sendMessage。 */

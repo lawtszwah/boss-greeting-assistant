@@ -366,6 +366,25 @@ export function createLedger({
       });
     },
 
+    /** 按状态列出岗位历史，最近更新的在前。 */
+    listByStatus(status) {
+      return enqueue(async () => {
+        const s = await load();
+        return Object.entries(s.history)
+          .filter(([, h]) => h.status === status)
+          .map(([jobId, h]) => ({ jobId, ...h }))
+          .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+      });
+    },
+
+    /** 任务锁状态，供后台对账和界面展示。 */
+    lockStatus() {
+      return enqueue(async () => {
+        const s = await load();
+        return s.lock ? { live: lockIsLive(s.lock), taskId: s.lock.taskId, ownerTabId: s.lock.ownerTabId } : { live: false };
+      });
+    },
+
     /** 用户核对：'contacted' | 'not_sent' | 'keep'。已占用额度不回退。 */
     reviewJob(jobId, decision) {
       return enqueue(async () => {

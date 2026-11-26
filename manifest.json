@@ -4,17 +4,29 @@
   "version": "0.0.0",
   "description": "在 BOSS 直聘网页端按条件搜索岗位，并以平台默认招呼语发起沟通。与 BOSS 直聘无关联。",
   "minimum_chrome_version": "120",
-  "permissions": ["storage"],
-  "host_permissions": ["https://www.zhipin.com/*"],
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://www.zhipin.com/*"
+  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"
   },
   "content_scripts": [
     {
-      "matches": ["https://www.zhipin.com/web/geek/jobs*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://www.zhipin.com/web/geek/jobs*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
-  ]
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "BOSS 打招呼助手"
+  }
 }
