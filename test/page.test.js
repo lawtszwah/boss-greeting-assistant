@@ -77,6 +77,8 @@ test('阻断检测：隐藏模板不算，验证码、限制和未知弹窗算�
 test('列表状态', () => {
   assert.equal(listStatus(createSearchPage({ jobs: [fakeJob(1)] }).doc), 'ready');
   assert.equal(listStatus(createSearchPage({ jobs: [] }).doc), 'empty');
+  // 真实无结果页：没有列表容器，只有「没有找到相关职位」。
+  assert.equal(listStatus(createSearchPage({ emptyResult: true }).doc), 'empty');
 });
 
 test('选中卡片后详情区切换到该岗位', async () => {

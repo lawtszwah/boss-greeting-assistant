@@ -94,12 +94,34 @@ test('设置有误时显示错误并标红，不发送开始', async () => {
   assert.equal(p.sent.filter((s) => s.msg.type === 'start').length, 0);
 });
 
-test('开始：保存设置并把校验后的配置发给当前标签页', async () => {
+test('开始前展示配置摘要；返回修改不发送', async () => {
+  const p = await open();
+  p.form.elements.keywords.value = '前端';
+  p.form.elements.excludeKeywords.value = '全段';
+  p.form.elements.sessionLimit.value = '1';
+  p.$('start').click();
+  await p.settle();
+  assert.equal(p.$('confirm').hidden, false);
+  const text = p.$('confirm-list').textContent;
+  assert.match(text, /排除关键词全段/);
+  assert.match(text, /本次最多发送1 条/);
+  assert.match(text, /北京（101010100）/);
+  assert.equal(p.$('start').disabled, true);
+  assert.equal(p.sent.filter((s) => s.msg.type === 'start').length, 0);
+  p.$('confirm-cancel').click();
+  await p.settle();
+  assert.equal(p.$('confirm').hidden, true);
+  assert.equal(p.sent.filter((s) => s.msg.type === 'start').length, 0);
+});
+
+test('开始：保存设置，确认摘要后把校验后的配置发给当前标签页', async () => {
   const p = await open();
   p.form.elements.keywords.value = '前端\nReact';
   p.form.elements.degree.value = '本科';
   p.form.elements.sessionLimit.value = '1';
   p.$('start').click();
+  await p.settle();
+  p.$('confirm-start').click();
   await p.settle();
   const start = p.sent.find((s) => s.msg.type === 'start');
   assert.equal(start.id, 5);
@@ -114,6 +136,8 @@ test('开始失败时显示原因', async () => {
   const p = await open({ onStart: () => ({ ok: false, reason: 'lock_held' }) });
   p.form.elements.keywords.value = '前端';
   p.$('start').click();
+  await p.settle();
+  p.$('confirm-start').click();
   await p.settle();
   assert.match(p.$('message').textContent, /其他标签页/);
   assert.ok(p.$('message').classList.contains('error'));

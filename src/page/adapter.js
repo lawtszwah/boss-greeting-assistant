@@ -26,6 +26,20 @@ export function createPageAdapter(doc, timeouts = {}) {
       }, { timeoutMs: t.list, intervalMs: 200 });
       return s ?? 'timeout';
     },
+    /** 诊断用：页面当前的列表相关状态，写入日志便于排查。 */
+    diagnose() {
+      const q = (sel) => doc.querySelector(sel);
+      return [
+        `path=${doc.defaultView.location.pathname}`,
+        `ready=${doc.readyState}`,
+        `visible=${doc.visibilityState}`,
+        `list=${Boolean(q('.job-list-container'))}`,
+        `cards=${doc.querySelectorAll('li.job-card-box').length}`,
+        `empty=${Boolean(q('.job-empty-box'))}`,
+        `loading=${Boolean(q('.loading-wait'))}`,
+        `status=${listStatus(doc)}`,
+      ].join(' ');
+    },
     readCards: () => readCards(doc),
     readDetail: () => readDetail(doc),
     verifyFilterState: (params) => verifyFilterState(doc, params),

@@ -140,3 +140,30 @@ const CODE_TEXT = {
 
 /** 跳过原因、待核对原因等代码的中文说明；未知代码原样返回。 */
 export const codeText = (code) => (code ? CODE_TEXT[code] ?? (code.startsWith('blocked_') ? reasonText(code) : code) : '');
+
+const SALARY_TEXT = { 402: '3K以下', 403: '3-5K', 404: '5-10K', 405: '10-20K', 406: '20-50K', 407: '50K以上' };
+const listOrNone = (arr) => (arr.length ? arr.join('、') : '无');
+
+/**
+ * 开始前展示的配置摘要（PRD §4 第 4 步）。返回 [标题, 内容] 列表。
+ * 排除项单独列出，便于发现错字：排除条件写错时，本应跳过的岗位会被发送。
+ */
+export function summarizeConfig(config, { cityName, cityCode, dailyUsed } = {}) {
+  const filters = [
+    config.jobTypes[0] && `求职类型 ${config.jobTypes[0]}`,
+    config.salaryBucket && `薪资 ${SALARY_TEXT[config.salaryBucket] ?? config.salaryBucket}`,
+    config.experiences[0] && `经验 ${config.experiences[0]}`,
+    config.degrees[0] && `学历 ${config.degrees[0]}`,
+  ].filter(Boolean);
+  const remainingToday = typeof dailyUsed === 'number' ? Math.max(config.dailyLimit - dailyUsed, 0) : config.dailyLimit;
+  const maxSend = Math.min(config.sessionLimit, remainingToday);
+  return [
+    ['城市', `${cityName ?? '未知'}${cityCode ? `（${cityCode}）` : ''}`],
+    ['关键词', config.keywords.join('、')],
+    ['平台筛选', filters.length ? filters.join('，') : '不限'],
+    ['排除关键词', listOrNone(config.excludeKeywords)],
+    ['排除公司', listOrNone(config.excludeCompanies)],
+    ['本次最多发送', `${maxSend} 条（本次上限 ${config.sessionLimit}，今日还剩 ${remainingToday}）`],
+    ['发送方式', '点击「立即沟通」，由平台发送你设置的默认招呼语'],
+  ];
+}

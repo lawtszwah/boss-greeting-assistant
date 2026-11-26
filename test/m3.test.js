@@ -7,7 +7,7 @@ import { createRunStore, RUN_STATUS } from '../src/core/run-state.js';
 import { createSettingsStore, RISK_NOTICE_VERSION } from '../src/core/settings.js';
 import { createLogStore } from '../src/core/log-store.js';
 import { createApp } from '../src/background/app.js';
-import { formToConfig, configToForm, reasonText, codeText } from '../src/popup/form.js';
+import { formToConfig, configToForm, reasonText, codeText, summarizeConfig } from '../src/popup/form.js';
 import { validateConfig } from '../src/core/config.js';
 
 test('设置：校验通过才保存', async () => {
@@ -101,4 +101,13 @@ test('表单与配置互转', () => {
   assert.equal(reasonText('custom_code'), 'custom_code');
   assert.equal(codeText('excluded_company'), '命中排除公司');
   assert.equal(codeText('blocked_captcha'), '出现验证码，请在平台完成验证');
+});
+
+test('配置摘要：今日剩余额度限制本次最多发送数', () => {
+  const { config } = validateConfig({ keywords: ['前端'], sessionLimit: 5, dailyLimit: 6, salaryBucket: '405', degrees: ['本科'] });
+  const rows = Object.fromEntries(summarizeConfig(config, { cityName: '深圳', cityCode: '101280600', dailyUsed: 4 }));
+  assert.equal(rows['本次最多发送'], '2 条（本次上限 5，今日还剩 2）');
+  assert.equal(rows['平台筛选'], '薪资 10-20K，学历 本科');
+  assert.equal(rows['排除关键词'], '无');
+  assert.equal(rows['城市'], '深圳（101280600）');
 });

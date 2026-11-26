@@ -236,6 +236,17 @@ test('AC-16 无结果换关键词；滚动加载批次与批次上限', async ()
   assert.ok(r.logs.some((l) => l.kind === 'batch_limit'));
 });
 
+test('AC-16 真实无结果页（无列表容器）：换下一个关键词', async () => {
+  const r = await simulate({
+    config: { keywords: ['前端', 'React'] },
+    jobsByKeyword: { React: [fakeJob(1, { title: 'React' })] },
+    pageOptions: (u) => (u.searchParams.get('query') === '前端' ? { emptyResult: true } : {}),
+  });
+  assert.deepEqual(r.clicks, ['fake0001']);
+  assert.equal(r.run.status, RUN_STATUS.COMPLETED);
+  assert.ok(r.logs.some((l) => l.kind === 'no_results' && l.keyword === '前端'));
+});
+
 test('AC-16 滚动加载无进展：暂停', async () => {
   const r = await simulate({ jobsByKeyword: { 前端: [fakeJob(1)] }, stall: true });
   assert.deepEqual(r.clicks, ['fake0001']);
