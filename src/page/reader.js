@@ -1,6 +1,7 @@
 // 页面读取：只读 DOM，不点击、不修改页面。所有函数接收 document，便于用模拟页面测试。
 
 import { SEL, TEXT, FILTER_LABELS, BLOCKER_PATTERNS, BLOCKER_PATHS } from './selectors.js';
+import { classifyTags } from '../core/filter.js';
 
 const JOB_ID_RE = /\/job_detail\/([A-Za-z0-9_~-]+)\.html/;
 
@@ -31,13 +32,14 @@ export function readCards(doc) {
     const link = li.querySelector(SEL.cardTitleLink);
     const href = link?.getAttribute('href') ?? null;
     const tags = [...li.querySelectorAll(SEL.cardTags)].map(text).filter(Boolean);
+    const { experience, degree } = classifyTags(tags);
     return {
       jobId: jobIdFromHref(href),
       url: href ? new URL(href, doc.baseURI).toString().replace(/[?#].*$/, '') : null,
       title: text(link),
       company: text(li.querySelector(SEL.cardCompany)),
-      experience: tags[0] ?? '',
-      degree: tags[1] ?? '',
+      experience,
+      degree,
       tags,
       element: li,
     };
