@@ -160,11 +160,14 @@ export function createLedger({
   }
 
   return {
-    /** 获取任务锁。已有存活锁则拒绝；锁过期时接管，并把遗留的未定尝试转为待核对（AC-14）。 */
+    /** 获取任务锁。同一持有者重入不改状态；其他持有者须等锁释放或过期（AC-14）。 */
     acquireLock({ taskId, ownerTabId }) {
       return enqueue(async () => {
         const s = await load();
-        if (lockIsLive(s.lock) && s.lock.taskId !== taskId) {
+        if (lockIsLive(s.lock)) {
+          if (s.lock.taskId === taskId && s.lock.ownerTabId === ownerTabId) {
+            return { acquired: true, recovered: [] };
+          }
           return { acquired: false, heldBy: { taskId: s.lock.taskId, ownerTabId: s.lock.ownerTabId } };
         }
         const recovered = recoverInFlight(s);
@@ -178,7 +181,7 @@ export function createLedger({
     heartbeat(taskId) {
       return enqueue(async () => {
         const s = await load();
-        if (!s.lock || s.lock.taskId !== taskId) return false;
+        if (!lockIsLive(s.lock) || s.lock.taskId !== taskId) return false;
         s.lock.heartbeatAt = now();
         await save(s, ['lock']);
         return true;
@@ -251,7 +254,7 @@ export function createLedger({
     beginAttempt({ taskId, job, sessionLimit, dailyLimit, entryState }) {
       return enqueue(async () => {
         const s = await load();
-        if (!s.lock || s.lock.taskId !== taskId) return { ok: false, reason: REJECT.LOCK_NOT_HELD };
+        if (!lockIsLive(s.lock) || s.lock.taskId !== taskId) return { ok: false, reason: REJECT.LOCK_NOT_HELD };
 
         const ineligible = ineligibleReason(s, job, taskId);
         if (ineligible) return { ok: false, reason: ineligible };
@@ -307,8 +310,8 @@ export function createLedger({
         if (attempt.result !== ATTEMPT_RESULT.IN_FLIGHT) {
           throw new Error(`attempt ${attemptId} already resolved as ${attempt.result}`);
         }
-        if (result === ATTEMPT_RESULT.SUCCESS && !evidence) {
-          throw new Error('success requires evidence');
+        if (result === ATTEMPT_RESULT.SUCCESS && evidence !== 'greet_dialog') {
+          throw new Error('success requires greet_dialog evidence');
         }
         if (![ATTEMPT_RESULT.SUCCESS, ATTEMPT_RESULT.NEEDS_REVIEW, ATTEMPT_RESULT.REJECTED].includes(result)) {
           throw new Error(`invalid result ${result}`);

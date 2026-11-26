@@ -119,7 +119,7 @@ export function validateConfig(input) {
     errors.push({ field: 'keywords', message: `搜索关键词最多 ${LIMITS.maxKeywords} 个` });
   }
 
-  if (config.salaryBucket !== null && !(config.salaryBucket in SALARY_BUCKETS)) {
+  if (config.salaryBucket !== null && !Object.hasOwn(SALARY_BUCKETS, config.salaryBucket)) {
     errors.push({ field: 'salaryBucket', message: '薪资须选择平台提供的档位' });
   }
 
