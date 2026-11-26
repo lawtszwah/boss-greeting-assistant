@@ -1,0 +1,154 @@
+// 配置默认值、规范化与校验（PRD §5）。纯函数，不依赖浏览器 API。
+
+export const LIMITS = Object.freeze({
+  maxKeywords: 10,
+  sessionLimit: { min: 1, max: 30 },
+  dailyLimit: { min: 1, max: 30 },
+  sendIntervalMinSec: 15,
+  actionIntervalMinSec: 3,
+  maxBatchesPerKeyword: { min: 1, max: 20 },
+});
+
+export const DEFAULT_CONFIG = Object.freeze({
+  keywords: [],
+  // 求职类型只依赖平台原生筛选并在 M2 核验；空数组表示不限。
+  jobTypes: [],
+  // 经验、学历：可接受的卡片取值列表，空数组表示不限。
+  experiences: [],
+  degrees: [],
+  salaryMinK: null,
+  salaryMaxK: null,
+  excludeKeywords: [],
+  excludeCompanies: [],
+  sessionLimit: 20,
+  dailyLimit: 30,
+  sendIntervalSec: Object.freeze({ min: 15, max: 30 }),
+  actionIntervalSec: Object.freeze({ min: 3, max: 8 }),
+  maxBatchesPerKeyword: 5,
+});
+
+/** 去首尾空白、去空项、按不区分大小写去重，保留首次出现的写法。 */
+export function normalizeList(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const item of value) {
+    if (typeof item !== 'string') continue;
+    const trimmed = item.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+  }
+  return out;
+}
+
+function toNullableNumber(value) {
+  if (value === null || value === undefined || value === '') return null;
+  return typeof value === 'number' ? value : Number(value);
+}
+
+function toNumber(value, fallback) {
+  if (value === null || value === undefined || value === '') return fallback;
+  return typeof value === 'number' ? value : Number(value);
+}
+
+/** 把用户输入合并到默认值上，得到结构完整的配置（未校验）。 */
+export function normalizeConfig(input = {}) {
+  const d = DEFAULT_CONFIG;
+  return {
+    keywords: normalizeList(input.keywords),
+    jobTypes: normalizeList(input.jobTypes),
+    experiences: normalizeList(input.experiences),
+    degrees: normalizeList(input.degrees),
+    salaryMinK: toNullableNumber(input.salaryMinK),
+    salaryMaxK: toNullableNumber(input.salaryMaxK),
+    excludeKeywords: normalizeList(input.excludeKeywords),
+    excludeCompanies: normalizeList(input.excludeCompanies),
+    sessionLimit: toNumber(input.sessionLimit, d.sessionLimit),
+    dailyLimit: toNumber(input.dailyLimit, d.dailyLimit),
+    sendIntervalSec: {
+      min: toNumber(input.sendIntervalSec?.min, d.sendIntervalSec.min),
+      max: toNumber(input.sendIntervalSec?.max, d.sendIntervalSec.max),
+    },
+    actionIntervalSec: {
+      min: toNumber(input.actionIntervalSec?.min, d.actionIntervalSec.min),
+      max: toNumber(input.actionIntervalSec?.max, d.actionIntervalSec.max),
+    },
+    maxBatchesPerKeyword: toNumber(input.maxBatchesPerKeyword, d.maxBatchesPerKeyword),
+  };
+}
+
+const isInt = (n) => Number.isInteger(n);
+const inRange = (n, { min, max }) => isInt(n) && n >= min && n <= max;
+const isNonNegative = (n) => typeof n === 'number' && Number.isFinite(n) && n >= 0;
+
+function validateInterval(errors, field, interval, minSec, label) {
+  const { min, max } = interval;
+  if (!isNonNegative(min) || !isNonNegative(max)) {
+    errors.push({ field, message: `${label}必须是数字` });
+  } else if (min < minSec) {
+    errors.push({ field, message: `${label}最小值不能少于 ${minSec} 秒` });
+  } else if (max < min) {
+    errors.push({ field, message: `${label}最大值不能小于最小值` });
+  }
+}
+
+/**
+ * 规范化并校验配置。
+ * @returns {{ ok: boolean, errors: {field: string, message: string}[], config: object }}
+ */
+export function validateConfig(input) {
+  const config = normalizeConfig(input);
+  const errors = [];
+
+  if (config.keywords.length === 0) {
+    errors.push({ field: 'keywords', message: '至少填写一个搜索关键词' });
+  } else if (config.keywords.length > LIMITS.maxKeywords) {
+    errors.push({ field: 'keywords', message: `搜索关键词最多 ${LIMITS.maxKeywords} 个` });
+  }
+
+  const { salaryMinK: lo, salaryMaxK: hi } = config;
+  if (lo !== null && !isNonNegative(lo)) {
+    errors.push({ field: 'salaryMinK', message: '最低薪资必须是非负数字' });
+  }
+  if (hi !== null && !isNonNegative(hi)) {
+    errors.push({ field: 'salaryMaxK', message: '最高薪资必须是非负数字' });
+  }
+  if (isNonNegative(lo) && isNonNegative(hi) && lo > hi) {
+    errors.push({ field: 'salaryMinK', message: '最低薪资不能高于最高薪资' });
+  }
+
+  if (!inRange(config.sessionLimit, LIMITS.sessionLimit)) {
+    errors.push({ field: 'sessionLimit', message: '本次发送上限须为 1–30 的整数' });
+  }
+  if (!inRange(config.dailyLimit, LIMITS.dailyLimit)) {
+    errors.push({ field: 'dailyLimit', message: '当日发送上限须为 1–30 的整数' });
+  }
+  if (!inRange(config.maxBatchesPerKeyword, LIMITS.maxBatchesPerKeyword)) {
+    errors.push({ field: 'maxBatchesPerKeyword', message: '每关键词最大批次数须为 1–20 的整数' });
+  }
+
+  validateInterval(errors, 'sendIntervalSec', config.sendIntervalSec, LIMITS.sendIntervalMinSec, '操作间隔');
+  validateInterval(errors, 'actionIntervalSec', config.actionIntervalSec, LIMITS.actionIntervalMinSec, '非发送操作间隔');
+
+  return { ok: errors.length === 0, errors, config };
+}
+
+function deepFreeze(obj) {
+  for (const value of Object.values(obj)) {
+    if (value && typeof value === 'object') deepFreeze(value);
+  }
+  return Object.freeze(obj);
+}
+
+/** 任务启动时的配置快照；运行中的配置修改不影响已启动任务。 */
+export function snapshotConfig(config) {
+  return deepFreeze(structuredClone(config));
+}
+
+/** 在 [min, max] 秒内取随机等待毫秒数。random 可注入以便测试。 */
+export function randomDelayMs({ min, max }, random = Math.random) {
+  return Math.round((min + (max - min) * random()) * 1000);
+}
