@@ -50,3 +50,17 @@ test('随机等待落在区间内', () => {
   assert.equal(randomDelayMs({ min: 15, max: 30 }, () => 0), 15000);
   assert.equal(randomDelayMs({ min: 15, max: 30 }, () => 1), 30000);
 });
+
+test('薪资档位拒绝原型链属性名', () => {
+  for (const salaryBucket of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
+    const r = validateConfig({ keywords: ['a'], salaryBucket });
+    assert.equal(r.ok, false);
+    assert.deepEqual(fields(r), ['salaryBucket']);
+  }
+});
+
+test('所有平台薪资档位均通过校验', () => {
+  for (const salaryBucket of ['402', '403', '404', '405', '406', '407']) {
+    assert.equal(validateConfig({ keywords: ['a'], salaryBucket }).ok, true);
+  }
+});

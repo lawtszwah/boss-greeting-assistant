@@ -14,6 +14,12 @@ export const JOB_STATUS = Object.freeze({
   REQUEUED: 'requeued', // 用户确认未发送并显式重新加入
 });
 
+/** 成功证据类型。发送成功只接受 GREET_DIALOG；PAGE_STATE 仅用于页面显示的已有沟通。 */
+export const EVIDENCE = Object.freeze({
+  GREET_DIALOG: 'greet_dialog', // 「已向BOSS发送消息」弹窗
+  PAGE_STATE: 'page_state',
+});
+
 export const ATTEMPT_RESULT = Object.freeze({
   IN_FLIGHT: 'in_flight',
   SUCCESS: 'success',
@@ -160,11 +166,14 @@ export function createLedger({
   }
 
   return {
-    /** 获取任务锁。已有存活锁则拒绝；锁过期时接管，并把遗留的未定尝试转为待核对（AC-14）。 */
+    /** 获取任务锁。同一持有者重入不改状态；其他持有者须等锁释放或过期（AC-14）。 */
     acquireLock({ taskId, ownerTabId }) {
       return enqueue(async () => {
         const s = await load();
-        if (lockIsLive(s.lock) && s.lock.taskId !== taskId) {
+        if (lockIsLive(s.lock)) {
+          if (s.lock.taskId === taskId && s.lock.ownerTabId === ownerTabId) {
+            return { acquired: true, recovered: [] };
+          }
           return { acquired: false, heldBy: { taskId: s.lock.taskId, ownerTabId: s.lock.ownerTabId } };
         }
         const recovered = recoverInFlight(s);
@@ -178,7 +187,7 @@ export function createLedger({
     heartbeat(taskId) {
       return enqueue(async () => {
         const s = await load();
-        if (!s.lock || s.lock.taskId !== taskId) return false;
+        if (!lockIsLive(s.lock) || s.lock.taskId !== taskId) return false;
         s.lock.heartbeatAt = now();
         await save(s, ['lock']);
         return true;
@@ -220,7 +229,7 @@ export function createLedger({
         const s = await load();
         const prev = s.history[job.jobId];
         if (prev?.status === JOB_STATUS.CONTACTED) return;
-        s.history[job.jobId] = { ...jobSummary(job), status: JOB_STATUS.CONTACTED, evidence: 'page_state', updatedAt: now() };
+        s.history[job.jobId] = { ...jobSummary(job), status: JOB_STATUS.CONTACTED, evidence: EVIDENCE.PAGE_STATE, updatedAt: now() };
         await save(s, ['history']);
       });
     },
@@ -251,7 +260,7 @@ export function createLedger({
     beginAttempt({ taskId, job, sessionLimit, dailyLimit, entryState }) {
       return enqueue(async () => {
         const s = await load();
-        if (!s.lock || s.lock.taskId !== taskId) return { ok: false, reason: REJECT.LOCK_NOT_HELD };
+        if (!lockIsLive(s.lock) || s.lock.taskId !== taskId) return { ok: false, reason: REJECT.LOCK_NOT_HELD };
 
         const ineligible = ineligibleReason(s, job, taskId);
         if (ineligible) return { ok: false, reason: ineligible };
@@ -296,7 +305,7 @@ export function createLedger({
     },
 
     /**
-     * 记录发送结果。success 需附证据类型，首版只有 'greet_dialog'（「已向BOSS发送消息」弹窗）。
+     * 记录发送结果。success 只接受 EVIDENCE.GREET_DIALOG。
      * 未知结果用 needs_review；平台明确拒绝用 rejected。
      */
     resolveAttempt(attemptId, { result, evidence = null, error = null }) {
@@ -307,8 +316,8 @@ export function createLedger({
         if (attempt.result !== ATTEMPT_RESULT.IN_FLIGHT) {
           throw new Error(`attempt ${attemptId} already resolved as ${attempt.result}`);
         }
-        if (result === ATTEMPT_RESULT.SUCCESS && !evidence) {
-          throw new Error('success requires evidence');
+        if (result === ATTEMPT_RESULT.SUCCESS && evidence !== EVIDENCE.GREET_DIALOG) {
+          throw new Error(`success requires ${EVIDENCE.GREET_DIALOG} evidence`);
         }
         if (![ATTEMPT_RESULT.SUCCESS, ATTEMPT_RESULT.NEEDS_REVIEW, ATTEMPT_RESULT.REJECTED].includes(result)) {
           throw new Error(`invalid result ${result}`);

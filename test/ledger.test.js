@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMemoryStorage } from '../src/core/storage.js';
-import { createLedger, INELIGIBLE, REJECT, JOB_STATUS, ATTEMPT_RESULT, localDateKey } from '../src/core/ledger.js';
+import { createLedger, INELIGIBLE, REJECT, JOB_STATUS, ATTEMPT_RESULT, EVIDENCE, localDateKey } from '../src/core/ledger.js';
 
 function setup({ start = Date.UTC(2026, 10, 26, 2, 0), tz = 'Australia/Brisbane', storage } = {}) {
   const clock = { t: start, tz };
@@ -22,7 +22,7 @@ const limits = { sessionLimit: 20, dailyLimit: 30 };
 
 async function send(ledger, taskId, j, result = ATTEMPT_RESULT.SUCCESS, lim = limits) {
   const r = await ledger.beginAttempt({ taskId, job: j, ...lim });
-  if (r.ok) await ledger.resolveAttempt(r.attemptId, { result, evidence: result === 'success' ? 'greet_dialog' : null });
+  if (r.ok) await ledger.resolveAttempt(r.attemptId, { result, evidence: result === 'success' ? EVIDENCE.GREET_DIALOG : null });
   return r;
 }
 
@@ -58,7 +58,7 @@ test('成功需要证据，已沟通岗位跨任务去重（AC-10）', async () 
   await ledger.acquireLock({ taskId: 't1', ownerTabId: 1 });
   const r = await ledger.beginAttempt({ taskId: 't1', job: job('1'), ...limits });
   await assert.rejects(ledger.resolveAttempt(r.attemptId, { result: 'success' }), /evidence/);
-  await ledger.resolveAttempt(r.attemptId, { result: 'success', evidence: 'greet_dialog' });
+  await ledger.resolveAttempt(r.attemptId, { result: 'success', evidence: EVIDENCE.GREET_DIALOG });
   await assert.rejects(ledger.resolveAttempt(r.attemptId, { result: 'success', evidence: 'x' }), /already resolved/);
   await ledger.releaseLock('t1');
 
@@ -180,6 +180,7 @@ test('AC-11 当日额度跨任务累计，次日重置', async () => {
   await send(ledger, 't2', job('b'), ATTEMPT_RESULT.SUCCESS, lim);
   assert.equal((await ledger.beginAttempt({ taskId: 't2', job: job('c'), ...lim })).reason, REJECT.DAILY_LIMIT);
   clock.t += 24 * 60 * 60 * 1000;
+  await ledger.acquireLock({ taskId: 't2', ownerTabId: 1 });
   assert.equal((await ledger.beginAttempt({ taskId: 't2', job: job('c'), ...lim })).ok, true);
 });
 
@@ -237,4 +238,60 @@ test('本地日期按时区计算', () => {
   const ms = Date.UTC(2026, 10, 26, 15, 0); // 布里斯班已是 27 日凌晨
   assert.equal(localDateKey(ms, 'Australia/Brisbane'), '2026-11-27');
   assert.equal(localDateKey(ms, 'UTC'), '2026-11-26');
+});
+
+test('同一持有者重复获取活锁保持幂等，不中断发送', async () => {
+  const { ledger, storage, clock } = setup();
+  await ledger.acquireLock({ taskId: 't1', ownerTabId: 1 });
+  const r = await ledger.beginAttempt({ taskId: 't1', job: job('live'), ...limits });
+  const before = storage.dump();
+  clock.t += 5_000;
+  assert.deepEqual(await ledger.acquireLock({ taskId: 't1', ownerTabId: 1 }), { acquired: true, recovered: [] });
+  assert.deepEqual(storage.dump(), before);
+  assert.equal(await ledger.resolveAttempt(r.attemptId, { result: 'success', evidence: EVIDENCE.GREET_DIALOG }), JOB_STATUS.CONTACTED);
+});
+
+test('同一任务的其他标签页不能接管活锁', async () => {
+  const { ledger, storage } = setup();
+  await ledger.acquireLock({ taskId: 't1', ownerTabId: 1 });
+  const r = await ledger.beginAttempt({ taskId: 't1', job: job('live'), ...limits });
+  const before = storage.dump();
+  assert.deepEqual(await ledger.acquireLock({ taskId: 't1', ownerTabId: 2 }), {
+    acquired: false, heldBy: { taskId: 't1', ownerTabId: 1 },
+  });
+  assert.deepEqual(storage.dump(), before);
+  assert.equal(await ledger.resolveAttempt(r.attemptId, { result: 'success', evidence: EVIDENCE.GREET_DIALOG }), JOB_STATUS.CONTACTED);
+});
+
+test('锁在过期边界及之后均不能发送或被心跳复活，重新获取后恢复未定记录', async () => {
+  for (const elapsed of [30_000, 31_000]) {
+    const { ledger, storage, clock } = setup();
+    await ledger.acquireLock({ taskId: 't1', ownerTabId: 1 });
+    const r = await ledger.beginAttempt({ taskId: 't1', job: job('pending'), ...limits });
+    clock.t += elapsed;
+    const before = storage.dump();
+    assert.deepEqual(await ledger.beginAttempt({ taskId: 't1', job: job('next'), ...limits }), {
+      ok: false, reason: REJECT.LOCK_NOT_HELD,
+    });
+    assert.equal(await ledger.heartbeat('t1'), false);
+    assert.deepEqual(storage.dump(), before);
+    assert.deepEqual(await ledger.acquireLock({ taskId: 't1', ownerTabId: 1 }), {
+      acquired: true, recovered: [r.attemptId],
+    });
+    assert.equal(storage.dump().attempts[r.attemptId].result, ATTEMPT_RESULT.INTERRUPTED);
+    assert.deepEqual((await ledger.listNeedsReview()).map((j) => j.jobId), ['pending']);
+    assert.equal((await ledger.beginAttempt({ taskId: 't1', job: job('next'), ...limits })).ok, true);
+  }
+});
+
+test('不支持的成功证据不能改变发送结果，合法证据仍可完成同一尝试', async () => {
+  const { ledger, storage } = setup();
+  await ledger.acquireLock({ taskId: 't1', ownerTabId: 1 });
+  const r = await ledger.beginAttempt({ taskId: 't1', job: job('evidence'), ...limits });
+  const before = storage.dump();
+  for (const evidence of [undefined, null, '', 'button_clicked', 'success', true, {}, [EVIDENCE.GREET_DIALOG]]) {
+    await assert.rejects(ledger.resolveAttempt(r.attemptId, { result: 'success', evidence }), /evidence/);
+    assert.deepEqual(storage.dump(), before);
+  }
+  assert.equal(await ledger.resolveAttempt(r.attemptId, { result: 'success', evidence: EVIDENCE.GREET_DIALOG }), JOB_STATUS.CONTACTED);
 });
