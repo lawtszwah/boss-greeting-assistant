@@ -14,6 +14,12 @@ export const JOB_STATUS = Object.freeze({
   REQUEUED: 'requeued', // 用户确认未发送并显式重新加入
 });
 
+/** 成功证据类型。发送成功只接受 GREET_DIALOG；PAGE_STATE 仅用于页面显示的已有沟通。 */
+export const EVIDENCE = Object.freeze({
+  GREET_DIALOG: 'greet_dialog', // 「已向BOSS发送消息」弹窗
+  PAGE_STATE: 'page_state',
+});
+
 export const ATTEMPT_RESULT = Object.freeze({
   IN_FLIGHT: 'in_flight',
   SUCCESS: 'success',
@@ -223,7 +229,7 @@ export function createLedger({
         const s = await load();
         const prev = s.history[job.jobId];
         if (prev?.status === JOB_STATUS.CONTACTED) return;
-        s.history[job.jobId] = { ...jobSummary(job), status: JOB_STATUS.CONTACTED, evidence: 'page_state', updatedAt: now() };
+        s.history[job.jobId] = { ...jobSummary(job), status: JOB_STATUS.CONTACTED, evidence: EVIDENCE.PAGE_STATE, updatedAt: now() };
         await save(s, ['history']);
       });
     },
@@ -299,7 +305,7 @@ export function createLedger({
     },
 
     /**
-     * 记录发送结果。success 需附证据类型，首版只有 'greet_dialog'（「已向BOSS发送消息」弹窗）。
+     * 记录发送结果。success 只接受 EVIDENCE.GREET_DIALOG。
      * 未知结果用 needs_review；平台明确拒绝用 rejected。
      */
     resolveAttempt(attemptId, { result, evidence = null, error = null }) {
@@ -310,8 +316,8 @@ export function createLedger({
         if (attempt.result !== ATTEMPT_RESULT.IN_FLIGHT) {
           throw new Error(`attempt ${attemptId} already resolved as ${attempt.result}`);
         }
-        if (result === ATTEMPT_RESULT.SUCCESS && evidence !== 'greet_dialog') {
-          throw new Error('success requires greet_dialog evidence');
+        if (result === ATTEMPT_RESULT.SUCCESS && evidence !== EVIDENCE.GREET_DIALOG) {
+          throw new Error(`success requires ${EVIDENCE.GREET_DIALOG} evidence`);
         }
         if (![ATTEMPT_RESULT.SUCCESS, ATTEMPT_RESULT.NEEDS_REVIEW, ATTEMPT_RESULT.REJECTED].includes(result)) {
           throw new Error(`invalid result ${result}`);
