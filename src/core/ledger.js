@@ -278,6 +278,7 @@ export function createLedger({
         }
 
         const id = newId();
+        const prevHistory = s.history[job.jobId] ?? null;
         s.attempts[id] = {
           id,
           taskId,
@@ -285,6 +286,8 @@ export function createLedger({
           startedAt: now(),
           entryState: entryState ?? null,
           result: ATTEMPT_RESULT.IN_FLIGHT,
+          prevHistory,
+          quotaDate: quota.date,
         };
         s.history[job.jobId] = { ...jobSummary(job), status: JOB_STATUS.IN_FLIGHT, attemptId: id, updatedAt: now() };
         s.quota = { ...quota, count: quota.count + 1 };
@@ -301,6 +304,28 @@ export function createLedger({
           return { ok: false, reason: REJECT.STORAGE_ERROR, error: String(error?.message ?? error) };
         }
         return { ok: true, attemptId: id, sessionUsed: sessionCount + 1, dailyUsed: quota.count + 1 };
+      });
+    },
+
+    /**
+     * 撤销尚未点击的尝试：例如持久化后发现已请求停止，或点击前目标已变化。
+     * 只能在确认没有触发任何可能发送的操作时调用；恢复岗位原状态并退回额度。
+     */
+    cancelAttempt(attemptId) {
+      return enqueue(async () => {
+        const s = await load();
+        const attempt = s.attempts[attemptId];
+        if (!attempt) throw new Error(`unknown attempt ${attemptId}`);
+        if (attempt.result !== ATTEMPT_RESULT.IN_FLIGHT) {
+          throw new Error(`attempt ${attemptId} already resolved as ${attempt.result}`);
+        }
+        delete s.attempts[attemptId];
+        if (attempt.prevHistory) s.history[attempt.jobId] = attempt.prevHistory;
+        else delete s.history[attempt.jobId];
+        if (s.quota && s.quota.date === attempt.quotaDate && s.quota.count > 0) {
+          s.quota = { ...s.quota, count: s.quota.count - 1 };
+        }
+        await save(s, ['attempts', 'history', 'quota']);
       });
     },
 

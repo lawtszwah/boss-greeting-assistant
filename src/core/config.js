@@ -22,11 +22,35 @@ export const SALARY_BUCKETS = Object.freeze({
   407: '50K以上',
 });
 
+/** 平台原生筛选项：页面显示文本 → URL 参数代码（同上来源）。 */
+export const FILTER_CODES = Object.freeze({
+  jobType: Object.freeze({ 全职: '1901', 兼职: '1903', 实习: '1902' }),
+  experience: Object.freeze({
+    在校生: '108',
+    应届生: '102',
+    经验不限: '101',
+    '1年以内': '103',
+    '1-3年': '104',
+    '3-5年': '105',
+    '5-10年': '106',
+    '10年以上': '107',
+  }),
+  degree: Object.freeze({
+    初中及以下: '209',
+    '中专/中技': '208',
+    高中: '206',
+    大专: '202',
+    本科: '203',
+    硕士: '204',
+    博士: '205',
+  }),
+});
+
 export const DEFAULT_CONFIG = Object.freeze({
   keywords: [],
-  // 求职类型只依赖平台原生筛选并在 M2 核验；空数组表示不限。
+  // 求职类型、经验、学历：首版各最多选一个平台取值，空数组表示不限。
+  // 通过平台原生筛选应用并核验；经验、学历另在卡片上复核。
   jobTypes: [],
-  // 经验、学历：可接受的卡片取值列表，空数组表示不限。
   experiences: [],
   degrees: [],
   // 平台薪资档位代码，null 表示不限。
@@ -117,6 +141,19 @@ export function validateConfig(input) {
     errors.push({ field: 'keywords', message: '至少填写一个搜索关键词' });
   } else if (config.keywords.length > LIMITS.maxKeywords) {
     errors.push({ field: 'keywords', message: `搜索关键词最多 ${LIMITS.maxKeywords} 个` });
+  }
+
+  for (const [field, kind, label] of [
+    ['jobTypes', 'jobType', '求职类型'],
+    ['experiences', 'experience', '工作经验'],
+    ['degrees', 'degree', '学历'],
+  ]) {
+    const values = config[field];
+    if (values.length > 1) {
+      errors.push({ field, message: `${label}首版只能选择一个` });
+    } else if (values.length === 1 && !Object.hasOwn(FILTER_CODES[kind], values[0])) {
+      errors.push({ field, message: `${label}须选择平台提供的选项` });
+    }
   }
 
   if (config.salaryBucket !== null && !Object.hasOwn(SALARY_BUCKETS, config.salaryBucket)) {
