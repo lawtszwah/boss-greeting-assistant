@@ -13,7 +13,7 @@ export const SEL = Object.freeze({
   cardTags: '.tag-list li',
   cardCompany: '.job-card-footer .boss-name',
   loading: '.loading-wait',
-  // 无结果时没有列表容器，显示「没有找到相关职位」（2026-11-27 核实）。
+  // 无结果时没有列表容器，显示「没有找到相关职位」（2026-11-26 核实）。
   emptyBox: '.job-empty-box',
 
   detail: '.job-detail-container',
