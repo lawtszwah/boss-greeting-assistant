@@ -5,7 +5,7 @@
 
 import { SALARY_BUCKETS, FILTER_CODES } from '../core/config.js';
 import { RISK_NOTICE } from '../core/settings.js';
-import { formToConfig, configToForm, NUMBER_FIELDS, ERROR_FIELD, statusText, reasonText, codeText } from './form.js';
+import { formToConfig, configToForm, NUMBER_FIELDS, ERROR_FIELD, statusText, reasonText, codeText, summarizeConfig } from './form.js';
 
 const SEARCH_URL_RE = /^https:\/\/www\.zhipin\.com\/web\/geek\/jobs/;
 
@@ -40,6 +40,7 @@ const LOG_TEXT = {
   pre_send_failure: (e) => `未点击：${e.jobId}（${codeText(e.error)}）`,
   no_results: (e) => `「${e.keyword}」没有结果`,
   batch_limit: (e) => `「${e.keyword}」已达批次上限`,
+  list_timeout: (e) => `列表加载超时（${e.detail}）`,
   search_mismatch: () => '搜索条件未生效',
   filter_mismatch: () => '筛选条件未生效',
   resolve_failed: (e) => `结果记录失败：${e.jobId}`,
@@ -125,25 +126,48 @@ export async function initPopup(doc, api) {
     renderButtons();
   });
 
-  // 开始与停止
+  // 开始与停止：先校验并保存设置，展示摘要（PRD §4），用户确认后才发给页面开始。
+  const hideConfirm = () => {
+    $('confirm').hidden = true;
+    ui.pendingConfig = null;
+    renderButtons();
+  };
   $('start').addEventListener('click', async () => {
     if (ui.busy) return;
-    ui.busy = true;
+    const res = await api.settings.saveConfig(formToConfig(readForm()));
+    showErrors(res.errors);
+    if (!res.ok) {
+      $('settings').open = true;
+      showMessage(reasonText('invalid_config'), true);
+      return;
+    }
+    ui.savedConfig = res.config;
+    if (!ui.tab || !ui.pageInfo) {
+      showMessage(reasonText('not_search_page'), true);
+      return;
+    }
+    showMessage('');
+    ui.pendingConfig = res.config;
+    const rows = summarizeConfig(res.config, {
+      cityName: ui.pageInfo.cityName,
+      cityCode: ui.pageInfo.cityCode,
+      dailyUsed: ui.status?.quota?.dailyUsed,
+    });
+    $('confirm-list').replaceChildren(...rows.flatMap(([k, v]) => [el(doc, 'dt', { textContent: k }), el(doc, 'dd', { textContent: v })]));
+    $('confirm').hidden = false;
     renderButtons();
+  });
+  $('confirm-cancel').addEventListener('click', () => {
+    hideConfirm();
+    $('settings').open = true;
+  });
+  $('confirm-start').addEventListener('click', async () => {
+    const config = ui.pendingConfig;
+    if (ui.busy || !config) return;
+    ui.busy = true;
+    hideConfirm();
     try {
-      const res = await api.settings.saveConfig(formToConfig(readForm()));
-      showErrors(res.errors);
-      if (!res.ok) {
-        $('settings').open = true;
-        showMessage(reasonText('invalid_config'), true);
-        return;
-      }
-      ui.savedConfig = res.config;
-      if (!ui.tab || !ui.pageInfo) {
-        showMessage(reasonText('not_search_page'), true);
-        return;
-      }
-      const r = await api.sendToTab(ui.tab.id, { type: 'start', config: res.config });
+      const r = await api.sendToTab(ui.tab.id, { type: 'start', config });
       if (r?.ok) showMessage('任务已开始，正在打开第一个关键词的搜索结果。关闭此弹窗不影响任务。');
       else showMessage(reasonText(r?.reason ?? 'unexpected_error'), true);
     } catch (e) {
@@ -215,11 +239,14 @@ export async function initPopup(doc, api) {
     $('start').hidden = running;
     $('stop').hidden = !running;
     $('stop').disabled = Boolean(ui.status?.run?.stopRequested);
-    $('start').disabled = ui.busy || !ui.pageInfo || Boolean(ui.pageInfo?.blocker);
+    $('start').disabled = ui.busy || !ui.pageInfo || Boolean(ui.pageInfo?.blocker) || !$('confirm').hidden;
   }
 
   function renderStatus(status) {
     const { run, quota } = status;
+    // 任务从运行中变为结束时，清除「任务已开始」之类的临时提示。
+    if (ui.lastRunStatus === 'running' && run?.status !== 'running') showMessage('');
+    ui.lastRunStatus = run?.status ?? null;
     const pill = $('status-pill');
     pill.textContent = run?.stopRequested && run.status === 'running' ? '停止中' : statusText(run);
     pill.dataset.status = run?.status ?? 'idle';

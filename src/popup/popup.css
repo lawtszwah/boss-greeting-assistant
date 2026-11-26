@@ -96,3 +96,8 @@ form .invalid { border-color: var(--danger); }
 .risk li { margin-bottom: 4px; }
 .check { display: block; margin: 8px 0; }
 footer { display: flex; justify-content: space-between; padding: 0 2px; }
+
+.confirm { border: 1px solid var(--accent); border-radius: 8px; padding: 10px; margin-top: 10px; }
+.confirm dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 10px; margin: 8px 0; font-size: 12px; }
+.confirm dt { color: var(--muted); }
+.confirm dd { margin: 0; word-break: break-all; }

@@ -121,9 +121,12 @@ export function detectBlocker(doc) {
   return null;
 }
 
-/** 列表状态：ready（有卡片）、empty（容器在但无卡片且不在加载）、loading。 */
+/** 列表状态：ready（有卡片）、empty（显示无结果，或容器在但无卡片且不在加载）、loading。 */
 export function listStatus(doc) {
   const container = doc.querySelector(SEL.listContainer);
+  if (container?.querySelector(SEL.card)) return 'ready';
+  const emptyBox = doc.querySelector(SEL.emptyBox);
+  if (emptyBox && isVisible(emptyBox)) return 'empty';
   if (!container) return 'loading';
   if (container.querySelector(SEL.card)) return 'ready';
   const loading = doc.querySelector(SEL.loading);

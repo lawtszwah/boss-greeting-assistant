@@ -227,7 +227,10 @@ export function createTaskRunner({
     checkBlocker();
     const listState = await page.waitList();
     checkBlocker();
-    if (listState === 'timeout') throw new Halt(RUN_STATUS.PAUSED, PAUSE.LIST_TIMEOUT);
+    if (listState === 'timeout') {
+      log({ kind: 'list_timeout', detail: page.diagnose?.() ?? '' });
+      throw new Halt(RUN_STATUS.PAUSED, PAUSE.LIST_TIMEOUT);
+    }
 
     const urlCheck = verifySearchUrl(page.url(), run.expectedUrl);
     if (!urlCheck.ok) {

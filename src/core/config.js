@@ -156,6 +156,10 @@ export function validateConfig(input) {
     }
   }
 
+  // 选「兼职」时平台不提供薪资档位筛选（2026-11-27 核实），无法核验，不允许同时设置。
+  if (config.salaryBucket !== null && config.jobTypes[0] === '兼职') {
+    errors.push({ field: 'salaryBucket', message: '兼职岗位不支持薪资档位筛选，请把薪资设为不限' });
+  }
   if (config.salaryBucket !== null && !Object.hasOwn(SALARY_BUCKETS, config.salaryBucket)) {
     errors.push({ field: 'salaryBucket', message: '薪资须选择平台提供的档位' });
   }

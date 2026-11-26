@@ -64,3 +64,9 @@ test('所有平台薪资档位均通过校验', () => {
     assert.equal(validateConfig({ keywords: ['a'], salaryBucket }).ok, true);
   }
 });
+
+test('兼职不能同时设置薪资档位', () => {
+  const r = validateConfig({ keywords: ['a'], jobTypes: ['兼职'], salaryBucket: '405' });
+  assert.deepEqual(r.errors.map((e) => e.field), ['salaryBucket']);
+  assert.equal(validateConfig({ keywords: ['a'], jobTypes: ['全职'], salaryBucket: '405' }).ok, true);
+});

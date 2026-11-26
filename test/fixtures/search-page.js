@@ -48,6 +48,7 @@ export function createSearchPage({
   onChat = greetSuccess(),
   url = 'https://www.zhipin.com/web/geek/jobs?query=%E5%89%8D%E7%AB%AF&city=101010100',
   extraHtml = '',
+  emptyResult = false,
 } = {}) {
   const dom = new JSDOM(
     `<!doctype html><html><body>
@@ -57,7 +58,9 @@ export function createSearchPage({
         ${filterBox('公司规模', false)}${filterBox('融资阶段', false)}
       </div>
       <div class="dialog-wrap upload-resume-dialog" style="display:none">上传附件简历</div>
-      <ul class="job-list-container">${jobs.map(cardHtml).join('')}</ul>
+      ${emptyResult
+        ? '<div class="job-recommend-result"><div class="job-empty-wrapper"><div class="job-empty-box"><p>没有找到相关职位</p></div></div></div>'
+        : `<ul class="job-list-container">${jobs.map(cardHtml).join('')}</ul>`}
       <div class="loading-wait" style="display:none"></div>
       <div class="job-detail-container"></div>
       ${extraHtml}
@@ -84,7 +87,7 @@ export function createSearchPage({
     });
   };
 
-  doc.querySelector('.job-list-container').addEventListener('click', (ev) => {
+  doc.querySelector('.job-list-container')?.addEventListener('click', (ev) => {
     const li = ev.target.closest('li.job-card-box');
     if (!li) return;
     const id = li.querySelector('a.job-name').getAttribute('href').match(/job_detail\/(\w+)\.html/)[1];
